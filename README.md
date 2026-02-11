@@ -79,3 +79,31 @@ bzcat core-image-base-raspberrypi5.wic.bz2 > rpi5-image-v2.wic
 
 ip addr show | grep "inet "
 ```
+
+**Create a recipe**
+# Step 1: Create directory structure
+mkdir -p ~/Documents/Yocto/yocto-ai-project/meta-homeai/recipes-apps/hello-embedded/files
+
+# Step 2: Create C source file
+cat > ~/Documents/Yocto/yocto-ai-project/meta-homeai/recipes-apps/hello-embedded/files/hello-embedded.c << 'EOF'
+
+
+CMakeLists.txt:              hello-embedded_1.0.bb:
+────────────────             ──────────────────────────
+✅ Find sources              ✅ Find sources (SRC_URI)
+✅ Compile                   ✅ Compile (do_compile)
+✅ Link                      ✅ Link
+❌ Download sources          ✅ Download from internet (git/http)
+❌ License checking          ✅ Verify license (LIC_FILES_CHKSUM)
+❌ Cross-compile setup       ✅ Cross-compile automatically
+❌ Package creation          ✅ Create .ipk/.deb/.rpm package
+❌ Dependency management     ✅ Handle all dependencies
+❌ Install to rootfs         ✅ Install to target rootfs (do_install)
+❌ Shared state cache        ✅ Cache results (sstate)
+
+Tool              Purpose
+────────────────────────────────────────────────────
+pyenv             Python version isolation
+virtualenv        Python package isolation
+source oe-init    BitBake environment isolation
+Docker            Full OS isolation

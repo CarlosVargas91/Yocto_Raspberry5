@@ -24,15 +24,15 @@ build-rpi5/sstate-cache/
 # Poky is cloned from Yocto's official repo.
 # It should be a git submodule reference, not tracked directly.
 # =============================================================================
-poky/
+poky/*
 
 # =============================================================================
 # OPENEMBEDDED LAYERS
 # These are external layers cloned from their own repos.
 # Should be referenced as submodules.
 # =============================================================================
-meta-openembedded/
-meta-raspberrypi/
+meta-openembedded/*
+meta-raspberrypi/*
 
 # =============================================================================
 # GENERATED IMAGE FILES
