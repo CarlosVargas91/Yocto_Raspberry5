@@ -23,6 +23,19 @@ source poky/oe-init-build-env build-rpi5
 nano conf/local.conf
 ```
 
+# Find disk number
+diskutil list
+
+# Unmount (don't eject)
+diskutil unmountDisk /dev/disk4
+
+# Flash directly - this erases everything
+sudo dd if=~/Downloads/rpi5-image.wic of=/dev/rdisk4 bs=4m status=progress
+
+# Sync and eject
+sync
+diskutil eject /dev/disk4
+
 **Make these changes:**
 
 1. **Find this line (around line 34):**
@@ -107,3 +120,31 @@ pyenv             Python version isolation
 virtualenv        Python package isolation
 source oe-init    BitBake environment isolation
 Docker            Full OS isolation
+
+## Complete Picture
+```
+STEP 1: .dts file
+"Describes the hardware configuration"
+(your homeai-overlay.dts)
+        ↓ compiled by dtc
+
+STEP 2: .dtbo file
+"Binary overlay sitting in /boot/overlays/"
+(homeai-overlay.dtbo)
+= File EXISTS but NOT yet active
+        ↓ activated by
+
+STEP 3: config.txt
+"Bootloader reads this and LOADS the overlay"
+dtoverlay=homeai-overlay
+= NOW the overlay is active!
+= Linux kernel sees I2C, SPI enabled
+        ↓ tells kernel
+
+STEP 4: Linux kernel
+"Reads combined device tree"
+= Loads i2c-bcm2835 driver
+= Loads spi-bcm2835 driver
+= /dev/i2c-1 appears!
+= /dev/spidev0.0 appears!
+```

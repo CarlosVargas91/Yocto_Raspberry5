@@ -1,0 +1,40 @@
+/*
+ * homeai-overlay.dts
+ * Custom Device Tree Overlay for meta-homeai
+ * Carlos Vargas - Embedded AI Project
+ *
+ * This overlay:
+ * - Enables I2C-1 bus
+ * - Enables SPI-0 bus
+ * - Configures GPIO for future use
+ */
+
+/dts-v1/;           /* DTS version - always needed */
+/plugin/;           /* This is an overlay (not full DT) */
+
+/ {
+    compatible = "brcm,bcm2712";  /* Pi 5 chip */
+
+    fragment@0 {        /* Each fragment modifies one hardware block */
+                        /* Like modifying one ECUC container */
+
+        target = <&i2c1>;   /* Which hardware to modify */
+                            /* &i2c1 = reference to I2C controller 1 */
+                            /* Like a pointer to AUTOSAR module config */
+
+        __overlay__ {       /* What changes to apply */
+            status = "okay";  /* "okay" = enabled, "disabled" = off */
+                            /* Like setting a module active/inactive */
+            clock-frequency = <400000>;  /* 400kHz */
+                                        /* Like setting baudrate in ECUC */
+        };
+    };
+
+    fragment@1 {
+        /* Target the SPI0 controller */
+        target = <&spi0>;
+        __overlay__ {
+            status = "okay";          /* Enable it! */
+        };
+    };
+};
