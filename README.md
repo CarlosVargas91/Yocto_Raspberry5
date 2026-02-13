@@ -148,3 +148,14 @@ STEP 4: Linux kernel
 = /dev/i2c-1 appears!
 = /dev/spidev0.0 appears!
 ```
+
+**Flashing SD**
+diskutil list
+diskutil unmountDisk /dev/disk4
+sudo dd if=/Users/goyi/Downloads/rpi5-image-v6-tflite.wic of=/dev/rdisk4 bs=4m status=progress
+sync
+diskutil eject /dev/disk4
+
+**Connect to raspberry pi5**
+ssh-keygen -R <IPADDRESS>
+ssh root@<IPADDRESS>
