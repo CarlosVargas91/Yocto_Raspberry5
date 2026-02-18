@@ -1,4 +1,3 @@
-cat > ~/test_oled_full.py << 'EOF'
 #!/usr/bin/env python3
 """
 Full SSD1306 OLED initialization and test
@@ -108,7 +107,3 @@ def init_oled_full():
 
 if __name__ == "__main__":
     init_oled_full()
-EOF
-
-chmod +x ~/test_oled_full.py
-python3 ~/test_oled_full.py
