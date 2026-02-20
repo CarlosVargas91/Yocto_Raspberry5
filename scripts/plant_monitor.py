@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
 """
-Complete Plant Monitor - FINAL VERSION
-Accurate BME280 calibration
+COMPLETE Plant Monitor - ALL SENSORS
+- BME280: Temperature & Humidity
+- BH1750: Light level  
+- MCP3008 + Soil Sensor: Soil moisture
+- SSD1306: Emotion display
 """
 
 import os
 import fcntl
 import time
 import struct
+import spidev
 
 I2C_SLAVE = 0x0703
 OLED_ADDR = 0x3C
 BME280_ADDR = 0x76
 BH1750_ADDR = 0x23
+
+# SPI for soil sensor
+spi = spidev.SpiDev()
+spi.open(0, 0)
+spi.max_speed_hz = 1350000
 
 # === OLED Functions ===
 def oled_cmd(fd, cmd):
@@ -73,7 +82,7 @@ def draw_emotion(fd, emotion):
         for i in range(88):
             oled_data(fd, 0xFF if 30 <= i <= 58 else 0x00)
 
-# === BME280 Functions (FULL CALIBRATION) ===
+# === BME280 Functions ===
 def read_bme_byte(fd, reg):
     fcntl.ioctl(fd, I2C_SLAVE, BME280_ADDR)
     os.write(fd, bytes([reg]))
@@ -91,16 +100,12 @@ def write_bme_byte(fd, reg, value):
     os.write(fd, bytes([reg, value]))
 
 def read_bme_calibration(fd):
-    """Read calibration parameters"""
     cal = {}
-    
-    # Temperature coefficients
     data = read_bme_bytes(fd, 0x88, 6)
     cal['T1'] = struct.unpack('<H', data[0:2])[0]
     cal['T2'] = struct.unpack('<h', data[2:4])[0]
     cal['T3'] = struct.unpack('<h', data[4:6])[0]
     
-    # Pressure coefficients
     data = read_bme_bytes(fd, 0x8E, 18)
     cal['P1'] = struct.unpack('<H', data[0:2])[0]
     cal['P2'] = struct.unpack('<h', data[2:4])[0]
@@ -112,7 +117,6 @@ def read_bme_calibration(fd):
     cal['P8'] = struct.unpack('<h', data[14:16])[0]
     cal['P9'] = struct.unpack('<h', data[16:18])[0]
     
-    # Humidity coefficients
     cal['H1'] = read_bme_byte(fd, 0xA1)
     data = read_bme_bytes(fd, 0xE1, 7)
     cal['H2'] = struct.unpack('<h', data[0:2])[0]
@@ -124,7 +128,6 @@ def read_bme_calibration(fd):
     return cal
 
 def compensate_temperature(adc_T, cal):
-    """Calculate temperature from raw ADC"""
     var1 = ((adc_T >> 3) - (cal['T1'] << 1)) * cal['T2'] >> 11
     var2 = (((adc_T >> 4) - cal['T1']) * ((adc_T >> 4) - cal['T1']) >> 12) * cal['T3'] >> 14
     t_fine = var1 + var2
@@ -132,7 +135,6 @@ def compensate_temperature(adc_T, cal):
     return temperature / 100.0, t_fine
 
 def compensate_humidity(adc_H, t_fine, cal):
-    """Calculate humidity from raw ADC"""
     v_x1_u32r = t_fine - 76800
     v_x1_u32r = (((((adc_H << 14) - (cal['H4'] << 20) - (cal['H5'] * v_x1_u32r)) + 
                    16384) >> 15) * (((((((v_x1_u32r * cal['H6']) >> 10) * 
@@ -146,22 +148,17 @@ def compensate_humidity(adc_H, t_fine, cal):
     return (v_x1_u32r >> 12) / 1024.0
 
 def init_bme280(fd):
-    """Initialize and return calibration"""
     write_bme_byte(fd, 0xF2, 0x01)
     write_bme_byte(fd, 0xF4, 0x27)
     time.sleep(0.1)
     return read_bme_calibration(fd)
 
 def read_bme280_calibrated(fd, cal):
-    """Read temperature and humidity with proper calibration"""
     data = read_bme_bytes(fd, 0xF7, 8)
-    
     adc_T = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4)
     adc_H = (data[6] << 8) | data[7]
-    
     temperature, t_fine = compensate_temperature(adc_T, cal)
     humidity = compensate_humidity(adc_H, t_fine, cal)
-    
     return temperature, humidity
 
 # === BH1750 Functions ===
@@ -178,9 +175,17 @@ def read_bh1750(fd):
     raw = struct.unpack('>H', data)[0]
     return raw / 1.2
 
-# === Plant Logic ===
-def evaluate_plant_health(temp, humidity, light):
-    """Determine plant emotion based on conditions"""
+# === Soil Moisture Functions ===
+def read_soil_moisture():
+    """Read soil sensor via MCP3008 CH0"""
+    adc = spi.xfer2([1, (8 + 0) << 4, 0])
+    data = ((adc[1] & 3) << 8) + adc[2]
+    moisture_percent = 100 - ((data / 1023.0) * 100)
+    return moisture_percent
+
+# === Plant Health Logic ===
+def evaluate_plant_health(temp, humidity, light, soil):
+    """Comprehensive plant health evaluation"""
     issues = []
     
     if temp < 15:
@@ -189,28 +194,33 @@ def evaluate_plant_health(temp, humidity, light):
         issues.append("too hot")
     
     if humidity < 30:
-        issues.append("too dry")
+        issues.append("air too dry")
     elif humidity > 70:
-        issues.append("too humid")
+        issues.append("air too humid")
     
     if light < 100:
         issues.append("too dark")
     elif light > 50000:
         issues.append("too bright")
     
+    # SOIL is the most critical!
+    if soil < 20:
+        issues.append("🚨 NEEDS WATER!")
+    elif soil < 40:
+        issues.append("soil getting dry")
+    
     if len(issues) == 0:
         return "happy", "😊", "Perfect conditions!"
     elif len(issues) == 1:
-        return "neutral", "😐", f"Needs: {issues[0]}"
+        return "neutral", "😐", f"{issues[0]}"
     else:
-        return "sad", "😢", f"Issues: {', '.join(issues)}"
+        return "sad", "😢", f"{', '.join(issues[:2])}"
 
 def main():
     fd = os.open('/dev/i2c-1', os.O_RDWR)
     
     print("🌱" * 30)
-    print("    PLANT MONITOR - FINAL VERSION")
-    print("    (Accurate Temperature)")
+    print("   COMPLETE PLANT MONITOR - ALL SENSORS")
     print("🌱" * 30)
     
     print("\nInitializing sensors...")
@@ -218,44 +228,48 @@ def main():
     print("✅ OLED Display ready")
     
     bme_cal = init_bme280(fd)
-    print("✅ BME280 (calibrated) ready")
+    print("✅ BME280 (temp/humidity) ready")
     
     init_bh1750(fd)
     print("✅ BH1750 (light) ready")
     
-    print("\n" + "=" * 70)
-    print("Monitoring plant health with ACCURATE readings... (Ctrl+C to stop)")
-    print("=" * 70 + "\n")
+    print("✅ MCP3008 + Soil sensor ready")
+    
+    print("\n" + "=" * 80)
+    print("Monitoring ALL parameters... (Ctrl+C to stop)")
+    print("=" * 80 + "\n")
     
     try:
         while True:
-            # Read all sensors
+            # Read all 4 sensors
             temp, humidity = read_bme280_calibrated(fd, bme_cal)
             light = read_bh1750(fd)
+            soil = read_soil_moisture()
             
             # Evaluate plant health
-            emotion, emoji, message = evaluate_plant_health(temp, humidity, light)
+            emotion, emoji, message = evaluate_plant_health(temp, humidity, light, soil)
             
             # Display emotion on OLED
             draw_emotion(fd, emotion)
             
-            # Print status
+            # Print comprehensive status
             print(f"{emoji} {emotion.upper():8s} | "
                   f"🌡️  {temp:5.1f}°C | "
                   f"💧 {humidity:4.0f}% | "
-                  f"💡 {light:6.0f} lux | "
+                  f"💡 {light:6.0f}lux | "
+                  f"🌱 {soil:4.0f}% | "
                   f"{message}")
             
             time.sleep(3)
             
     except KeyboardInterrupt:
         print("\n\n" + "🌱" * 30)
-        print("    Final session complete!")
+        print("   Complete plant monitor stopped")
         print("🌱" * 30)
         clear_oled(fd)
+        spi.close()
     
     os.close(fd)
 
 if __name__ == "__main__":
     main()
-EOF
