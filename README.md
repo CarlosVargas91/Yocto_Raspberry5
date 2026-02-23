@@ -556,7 +556,7 @@ htop
 
 ## 🔗 Related Projects
 
-- **Plant Monitor Application:** [plant-monitor repository](https://github.com/YOUR_USERNAME/plant-monitor)
+- **Plant Monitor Application:** [plant-monitor repository](https://github.com/CarlosVargas91/Yocto-PlantMonitor)
 - **Yocto Project:** https://www.yoctoproject.org/
 - **meta-raspberrypi:** https://github.com/agherzan/meta-raspberrypi
 
